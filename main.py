@@ -212,7 +212,7 @@ class ProgressBar(tk.Frame):
         tk.Frame.__init__(self, parent, *args, **kwargs)
         self.parent = parent
 
-        self.progress_bar = ttk.Progressbar(self)
+        self.progress_bar = ttk.Progressbar(self, mode='determinate')
 
         self.progress_bar.grid(row=0, column=0, sticky=tk.EW)
 
@@ -242,13 +242,17 @@ class ModUnpacker(tk.Frame):
                 unpack_folder_name)).start()
 
     def unpack_process(self, unpacker_file, mod_list, unpack_folder):
+        self.parent.progress_bar.progress_bar['value'] = 0
         for mod_location in mod_list:
             unpack_location = unpack_folder + '\\' + mod_location.split('\\')[-2]
             cmd = '\"{}\" \"{}\" \"{}\"'.format(unpacker_file, mod_location, unpack_location)
-            print(cmd)
-            if subprocess.check_output(cmd)[0] == 'U':
-                pass
-
+            if str(subprocess.check_output(cmd))[0] == 'b':
+                if mod_list.index(mod_location) == len(mod_list):
+                    self.parent.progress_bar.progress_bar['value'] = 100
+                else:
+                    self.parent.progress_bar.progress_bar['value'] = self.parent.progress_bar.progress_bar['value'] + \
+                                                                     round(100/len(mod_list))
+            break
 
 if __name__ == "__main__":
     root = tk.Tk()
