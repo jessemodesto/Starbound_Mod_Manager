@@ -18,6 +18,7 @@ class GuiUtilities:
     def check_paths(self):
         self.starbound_folder_check()
         self.steamworkshop_folder_check()
+        self.starbound_folder_check()
 
     def starbound_folder_check(self):
         if os.path.isfile('starboundfolder.txt'):
@@ -80,6 +81,14 @@ class GuiUtilities:
             messagebox.showerror('steamworkshopfolder.txt error', 'steamworkshopfolder.txt is an empty file!')
             self.steamworkshop_folder = None
             os.remove('steamworkshopfolder.txt')
+
+    def unpack_folder_check(self):
+        if os.path.isfile('unpackfolder.txt'):
+            with open('unpackfolder.txt', 'r') as reader:
+                file_content = reader.readlines()
+        else:
+            return
+        # Add checks here
 
 
 class MainApplication(tk.Frame):
@@ -200,11 +209,21 @@ class UnpackFolder(tk.Frame):
     def unpack_folder_button_click(self):
         unpack_folder = filedialog.askdirectory(title="Select unpacked mods directory")
         if unpack_folder:
-            pass
+            with open('unpackfolder.txt', "w") as writer:
+                writer.write(unpack_folder)
+            gui_util.unpack_folder_check()
             self.update_unpack_folder_destination()
 
     def update_unpack_folder_destination(self):
-        pass
+        if gui_util.unpack_folder:
+            self.unpack_folder_destination.configure(state=tk.NORMAL)
+            self.unpack_folder_destination.delete("1.0", tk.END)
+            self.unpack_folder_destination.insert(tk.END, gui_util.unpack_folder)
+            self.unpack_folder_destination.configure(state=tk.DISABLED)
+        else:
+            self.unpack_folder_destination.configure(state=tk.NORMAL)
+            self.unpack_folder_destination.delete("1.0", tk.END)
+            self.unpack_folder_destination.configure(state=tk.DISABLED)
 
 
 class ProgressBar(tk.Frame):
@@ -232,8 +251,8 @@ class ModUnpacker(tk.Frame):
 
     def unpack_mods(self):
         if gui_util.mod_list:
-            unpacker_file = (gui_util.starbound_folder + '/win32/asset_unpacker.exe').replace('/', '\\')
             mod_list = gui_util.mod_list
+            unpacker_file = (gui_util.starbound_folder + '/win32/asset_unpacker.exe').replace('/', '\\')
             unpack_folder_name = os.getcwd() + '\\unpack' + str(datetime.datetime.now()).replace(':', '-')
             os.mkdir(unpack_folder_name)
             threading.Thread(target=self.unpack_process, args=(
@@ -242,6 +261,10 @@ class ModUnpacker(tk.Frame):
                 unpack_folder_name)).start()
 
     def unpack_process(self, unpacker_file, mod_list, unpack_folder):
+        self.unpack_button.configure(state=tk.DISABLED)
+        self.parent.unpack_folder_select.unpack_folder_button.configure(state=tk.DISABLED)
+        gui_util.unpack_folder = unpack_folder.replace('\\', '/')
+        self.parent.unpack_folder_select.update_unpack_folder_destination()
         self.parent.progress_bar.progress_bar['value'] = 0
         for mod_location in mod_list:
             unpack_location = unpack_folder + '\\' + mod_location.split('\\')[-2]
@@ -252,7 +275,14 @@ class ModUnpacker(tk.Frame):
                 else:
                     self.parent.progress_bar.progress_bar['value'] = self.parent.progress_bar.progress_bar['value'] + \
                                                                      round(100/len(mod_list))
-            break
+        gui_util.unpack_folder = None
+        with open('unpackfolder.txt', "w") as writer:
+            writer.write(unpack_folder.replace('\\', '/'))
+        gui_util.unpack_folder_check()
+        self.parent.unpack_folder_select.update_unpack_folder_destination()
+        self.unpack_button.configure(state=tk.NORMAL)
+        self.parent.unpack_folder_select.unpack_folder_button.configure(state=tk.DISABLED)
+
 
 if __name__ == "__main__":
     root = tk.Tk()
