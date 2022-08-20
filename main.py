@@ -10,8 +10,9 @@ class GuiUtilities:
     def __init__(self):
         self.starbound_folder = None
         self.steamworkshop_folder = None
-        self.mod_list = []
         self.unpack_folder = None
+        self.mod_list = []
+        self.metadata_list = []
 
         self.check_paths()
 
@@ -19,6 +20,7 @@ class GuiUtilities:
         self.starbound_folder_check()
         self.steamworkshop_folder_check()
         self.starbound_folder_check()
+        self.unpack_folder_check()
 
     def starbound_folder_check(self):
         if os.path.isfile('starboundfolder.txt'):
@@ -49,6 +51,7 @@ class GuiUtilities:
         if file_content:
             if os.path.isdir(file_content[0]):
                 if os.listdir(file_content[0]):
+                    self.mod_list = []
                     for workshop_folder_item in os.listdir(file_content[0]):
                         if os.path.isdir(os.path.join(file_content[0], workshop_folder_item).replace("\\", "/")):
                             for workshop_mod_folder_item in os.listdir(
@@ -88,7 +91,43 @@ class GuiUtilities:
                 file_content = reader.readlines()
         else:
             return
-        # Add checks here
+        if file_content:
+            if os.path.isdir(file_content[0]):
+                if os.listdir(file_content[0]):
+                    self.metadata_list = []
+                    for unpack_folder_item in os.listdir(file_content[0]):
+                        if os.path.isdir(os.path.join(file_content[0], unpack_folder_item).replace("\\", "/")):
+                            for unpack_mod_folder_item in os.listdir(
+                                    os.path.join(file_content[0], unpack_folder_item).replace("\\", "/")):
+                                if os.path.isfile(
+                                        os.path.join(
+                                            file_content[0],
+                                            unpack_folder_item, unpack_mod_folder_item).replace("\\", "/")) and \
+                                        'metadata' in unpack_mod_folder_item:
+                                    self.metadata_list.append(os.path.join(
+                                        file_content[0],
+                                        unpack_folder_item, unpack_mod_folder_item).replace("\\", "/"))
+                    if not self.metadata_list:
+                        messagebox.showerror('unpackfolder.txt error',
+                                             'there are no metadata files in folders of unpackfolder.txt!')
+                        self.unpack_folder = None
+                        os.remove('unpackfolder.txt')
+                    else:
+                        self.unpack_folder = file_content[0]
+                else:
+                    messagebox.showerror('unpackfolder.txt error',
+                                         'there are no mod sub-folders in unpackfolder.txt!')
+                    self.unpack_folder = None
+                    os.remove('unpackfolder.txt')
+            else:
+                messagebox.showerror('unpackfolder.txt error', 'unpackfolder.txt is not a folder!')
+                self.unpack_folder = None
+                os.remove('unpackfolder.txt')
+        else:
+            messagebox.showerror('unpackfolder.txt error', 'unpackfolder.txt is an empty file!')
+            self.unpack_folder = None
+            os.remove('unpackfolder.txt')
+        print(self.metadata_list)
 
 
 class MainApplication(tk.Frame):
@@ -263,6 +302,8 @@ class ModUnpacker(tk.Frame):
     def unpack_process(self, unpacker_file, mod_list, unpack_folder):
         self.unpack_button.configure(state=tk.DISABLED)
         self.parent.unpack_folder_select.unpack_folder_button.configure(state=tk.DISABLED)
+        self.parent.steamworkshop_folder_select.steamworkshop_folder_button.configure(state=tk.DISABLED)
+        self.parent.starbound_folder_select.starbound_folder_button.configure(state=tk.DISABLED)
         gui_util.unpack_folder = unpack_folder.replace('\\', '/')
         self.parent.unpack_folder_select.update_unpack_folder_destination()
         self.parent.progress_bar.progress_bar['value'] = 0
@@ -281,7 +322,9 @@ class ModUnpacker(tk.Frame):
         gui_util.unpack_folder_check()
         self.parent.unpack_folder_select.update_unpack_folder_destination()
         self.unpack_button.configure(state=tk.NORMAL)
-        self.parent.unpack_folder_select.unpack_folder_button.configure(state=tk.DISABLED)
+        self.parent.steamworkshop_folder_select.steamworkshop_folder_button.configure(state=tk.NORMAL)
+        self.parent.starbound_folder_select.starbound_folder_button.configure(state=tk.NORMAL)
+        self.parent.unpack_folder_select.unpack_folder_button.configure(state=tk.NORMAL)
 
 
 if __name__ == "__main__":
