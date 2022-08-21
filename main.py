@@ -4,6 +4,7 @@ from tkinter import ttk, filedialog, messagebox
 import os.path
 import datetime
 import threading
+import json
 
 
 class GuiUtilities:
@@ -13,6 +14,18 @@ class GuiUtilities:
         self.unpack_folder = None
         self.mod_list = []
         self.metadata_list = []
+        self.metadata_dict = {'name': [],
+                              'friendlyname': [],
+                              'description': [],
+                              'author': [],
+                              'version': [],
+                              'link': [],
+                              'steamContentId': [],
+                              'tags': [],
+                              'includes': [],
+                              'requires': [],
+                              'priority': [],
+                              'iid': []}
 
         self.check_paths()
 
@@ -21,6 +34,7 @@ class GuiUtilities:
         self.steamworkshop_folder_check()
         self.starbound_folder_check()
         self.unpack_folder_check()
+        self.metadata_read()
 
     def starbound_folder_check(self):
         if os.path.isfile('starboundfolder.txt'):
@@ -127,7 +141,28 @@ class GuiUtilities:
             messagebox.showerror('unpackfolder.txt error', 'unpackfolder.txt is an empty file!')
             self.unpack_folder = None
             os.remove('unpackfolder.txt')
-        print(self.metadata_list)
+
+    def metadata_read(self):
+        if self.metadata_list:
+            for keyword in self.metadata_dict.keys():
+                self.metadata_dict[keyword] = []
+            for metadata_file in self.metadata_list:
+                file = open(metadata_file, 'r')
+                metadata_json = json.load(file)
+                for keyword in self.metadata_dict.keys():
+                    if keyword in metadata_json:
+                        self.metadata_dict[keyword].append(metadata_json[keyword])
+                    elif keyword == 'iid' and 'steamContentId' in metadata_json.keys():
+                        if metadata_json['steamContentId'] in self.metadata_dict['iid']:
+                            print(metadata_json['steamContentId'])
+                            self.metadata_dict['iid'].append(metadata_json['steamContentId']+'.{}'.format(
+                                self.metadata_list.index(metadata_file)))
+                        else:
+                            self.metadata_dict['iid'].append(metadata_json['steamContentId'])
+                    else:
+                        self.metadata_dict[keyword].append(None)
+                file.close()
+        print(self.metadata_dict)
 
 
 class MainApplication(tk.Frame):
@@ -140,15 +175,17 @@ class MainApplication(tk.Frame):
         self.unpack_folder_select = UnpackFolder(self)
         self.progress_bar = ProgressBar(self)
         self.mod_unpacker = ModUnpacker(self)
+        self.mod_view = ModView(self)
 
         self.starbound_folder_select.grid(row=0, column=0, sticky=tk.EW)
         self.steamworkshop_folder_select.grid(row=1, column=0, sticky=tk.EW)
         self.unpack_folder_select.grid(row=2, column=0, sticky=tk.EW)
         self.progress_bar.grid(row=3, column=0, sticky=tk.EW)
         self.mod_unpacker.grid(row=4, column=0, sticky=tk.EW)
+        self.mod_view.grid(row=5, column=0, sticky=tk.NSEW)
 
         self.grid_columnconfigure(0, weight=1)
-
+        self.grid_rowconfigure(5, weight=1)
 
 class StarboundFolder(tk.Frame):
     def __init__(self, parent, *args, **kwargs):
@@ -259,6 +296,7 @@ class UnpackFolder(tk.Frame):
             self.unpack_folder_destination.delete("1.0", tk.END)
             self.unpack_folder_destination.insert(tk.END, gui_util.unpack_folder)
             self.unpack_folder_destination.configure(state=tk.DISABLED)
+            print(gui_util.metadata_list)
         else:
             self.unpack_folder_destination.configure(state=tk.NORMAL)
             self.unpack_folder_destination.delete("1.0", tk.END)
@@ -309,6 +347,8 @@ class ModUnpacker(tk.Frame):
         self.parent.progress_bar.progress_bar['value'] = 0
         for mod_location in mod_list:
             unpack_location = unpack_folder + '\\' + mod_location.split('\\')[-2]
+            if os.path.isdir(unpack_location):
+                unpack_location = unpack_location + '_{}'.format(str(mod_list.index(mod_location)))
             cmd = '\"{}\" \"{}\" \"{}\"'.format(unpacker_file, mod_location, unpack_location)
             if str(subprocess.check_output(cmd))[0] == 'b':
                 if mod_list.index(mod_location) == len(mod_list):
@@ -320,11 +360,40 @@ class ModUnpacker(tk.Frame):
         with open('unpackfolder.txt', "w") as writer:
             writer.write(unpack_folder.replace('\\', '/'))
         gui_util.unpack_folder_check()
+        gui_util.metadata_read()
+        self.parent.mod_view.update_tree()
         self.parent.unpack_folder_select.update_unpack_folder_destination()
         self.unpack_button.configure(state=tk.NORMAL)
         self.parent.steamworkshop_folder_select.steamworkshop_folder_button.configure(state=tk.NORMAL)
         self.parent.starbound_folder_select.starbound_folder_button.configure(state=tk.NORMAL)
         self.parent.unpack_folder_select.unpack_folder_button.configure(state=tk.NORMAL)
+
+
+class ModView(tk.Frame):
+    def __init__(self, parent, *args, **kwargs):
+        tk.Frame.__init__(self, parent, *args, **kwargs)
+        self.parent = parent
+
+        self.treeview = ttk.Treeview(self, show='headings')
+        self.treeview["columns"] = ('name', 'steamContentId', 'includes', 'requires', 'priority')
+        for column in self.treeview['columns']:
+            self.treeview.heading(column, text=column)
+        self.update_tree()
+
+        self.treeview.grid(row=0, column=0, sticky=tk.NSEW)
+
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+
+    def update_tree(self):
+        if gui_util.metadata_dict['name']:
+            for n in range(len(gui_util.metadata_dict['name'])):
+                self.treeview.insert(parent='', index=tk.END, iid=gui_util.metadata_dict['iid'][n], text='',
+                                     values=(gui_util.metadata_dict["name"][n],
+                                             gui_util.metadata_dict["steamContentId"][n],
+                                             gui_util.metadata_dict["includes"][n],
+                                             gui_util.metadata_dict["requires"][n],
+                                             gui_util.metadata_dict["priority"][n]))
 
 
 if __name__ == "__main__":
